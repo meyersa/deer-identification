@@ -14,6 +14,9 @@ dotenv.load_dotenv()
 
 API_URL = os.getenv("API_URL")
 API_BEARER = os.getenv("API_BEARER")
+IMAGE_TOTAL = os.getenv("IMAGE_TOTAL")
+
+print(IMAGE_TOTAL)
 
 IMAGE_DIR = os.path.join(os.getcwd(), "images")
 TAKE_AMOUNT = 50
@@ -188,11 +191,14 @@ def build_images():
     preflight_checks()
 
     skip = 0
-    total = get_image_count()
+
+    global IMAGE_TOTAL
+    if not IMAGE_TOTAL:
+        IMAGE_TOTAL = get_image_count()
 
     while True: 
         # <-- Get images section -->
-        print(f'Getting images {skip}/{total}...')
+        print(f'Getting images {skip}/{IMAGE_TOTAL}...')
 
         res_images = get_image_range(skip)
         print(f'Received {len(res_images)}. Saving...')
@@ -219,7 +225,7 @@ def build_images():
         print(f'Saved all images')
 
         # <-- Skip logic --> 
-        dif = total - skip
+        dif = IMAGE_TOTAL - skip
         # If skip gap is greater than skip amount, add amount
         if dif > TAKE_AMOUNT: 
             skip += TAKE_AMOUNT
