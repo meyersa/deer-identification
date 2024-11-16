@@ -110,7 +110,7 @@ def get_image_range(skip):
 
     image_res = res.json()
 
-    print(f'Found {len(image_res)} images for {skip}')
+    print(f'Found {len(image_res.get("images"))} images for {skip}')
 
     image_dict = dict() 
     for image in image_res.get("images"): 
@@ -147,7 +147,11 @@ def get_image(url, fullFilename):
     print(f'Getting image {fullFilename}...')
     
     file_path = os.path.join(IMAGE_DIR, fullFilename)
-
+    
+    if os.path.exists(file_path): 
+        print(f'Image {fullFilename} already exists, skipping')
+        return 
+    
     try: 
         res = requests.get(url, stream=True)
         res.raise_for_status()
@@ -155,6 +159,8 @@ def get_image(url, fullFilename):
         with open(file_path, 'wb') as f: 
             for chunk in res.iter_content(chunk_size=8192):
                 f.write(chunk)
+
+        print(f'Image {fullFilename} saved')
 
     except Exception as e: 
         print(f'Failed to download image.', e)
@@ -191,7 +197,8 @@ def build_images():
             while True: 
                 try:
                     get_image(image.get("imageUrl"), image.get("fullFilename"))
-                
+                    break 
+
                 except: 
                     fail_count += 1
 
@@ -203,8 +210,6 @@ def build_images():
                     print(f'Failed to get image {image.get("fullFilename")}. Retrying in {15 * fail_count} seconds...')
                     time.sleep(15 * fail_count)
         
-            time.sleep(5)
-
         print(f'Saved all images')
 
         # <-- Skip logic --> 
