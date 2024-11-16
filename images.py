@@ -9,6 +9,8 @@ import dotenv
 import time 
 import cv2
 import numpy as np
+from PIL import Image
+import imagehash
 
 dotenv.load_dotenv()
 
@@ -22,6 +24,7 @@ IMAGE_TOTAL = int(os.getenv("IMAGE_TOTAL"))
 # Default values
 TAKE_AMOUNT = int(os.getenv("TAKE_AMOUNT") or 50)
 IMAGE_DIR = os.path.join(os.getcwd(), "images")
+IMAGE_SIM_THRESH = int(os.getenv("IMAGE_SIM_THRESH") or 100)
 
 post_headers = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
@@ -166,7 +169,7 @@ def get_image(url, fullFilename):
 
         if image is not None:
             # Remove 50-pixel border at the bottom
-            cropped_image = image[:-50, :]  # Crop 50 pixels from the bottom
+            cropped_image = image[:-35, :]  # Crop 50 pixels from the bottom
 
             # Save cropped image
             cv2.imwrite(file_path, cropped_image)
@@ -243,5 +246,32 @@ def build_images():
         if skip > (image_total - 1): 
             break
 
+def remove_similar_images():
+    """
+    Remove visually similar images based on perceptual hash.
+    """
+    removed = 0 
+
+    hashes = {}
+    for filename in os.listdir(IMAGE_DIR):
+        file_path = os.path.join(IMAGE_DIR, filename)
+        if os.path.isfile(file_path):
+            try:
+                img = Image.open(file_path)
+                phash = imagehash.phash(img)  # Calculate perceptual hash
+                if any(phash - h >= IMAGE_SIM_THRESH for h in hashes.keys()):
+                    print(f"Similar image found: {file_path}, removing.")
+                    os.remove(file_path)
+                    removed += 1
+                else:
+
+                    hashes[phash] = file_path
+            except Exception as e:
+                print(f"Error processing {file_path}: {e}")
+
+    print(str(IMAGE_SIM_THRESH) + " " + str(removed))
+
+
 if __name__ == "__main__":
     build_images()
+    remove_similar_images()
