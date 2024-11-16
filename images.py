@@ -7,6 +7,8 @@ import json
 import os 
 import dotenv
 import time 
+import cv2
+import numpy as np
 
 dotenv.load_dotenv()
 
@@ -133,36 +135,40 @@ def get_image_range(skip):
 
     return image_dict
 
-def get_image(url, fullFilename): 
+def get_image(url, fullFilename):
     """
-    Download an image from the provided URL and save it to the specified directory with the given filename.
+    Download an image from the provided URL, save it, and remove a 50-pixel border at the bottom.
 
     Args:
         url (str): The URL from which the image will be downloaded.
         fullFilename (str): The name with which the image will be saved in the local directory.
-
-    Raises:
-        Exception: If an error occurs during the download (e.g., connection issues or failed request).
     """
     print(f'Getting image {fullFilename}...')
-    
     file_path = os.path.join(IMAGE_DIR, fullFilename)
-    
-    if os.path.exists(file_path): 
+
+    if os.path.exists(file_path):
         print(f'Image {fullFilename} already exists, skipping')
-        return 
-    
-    try: 
+        return
+
+    try:
         res = requests.get(url, stream=True)
         res.raise_for_status()
         
-        with open(file_path, 'wb') as f: 
-            for chunk in res.iter_content(chunk_size=8192):
-                f.write(chunk)
+        # Load image into memory
+        image_array = np.asarray(bytearray(res.content), dtype=np.uint8)
+        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
 
-        print(f'Image {fullFilename} saved')
+        if image is not None:
+            # Remove 50-pixel border at the bottom
+            cropped_image = image[:-50, :]  # Crop 50 pixels from the bottom
 
-    except Exception as e: 
+            # Save cropped image
+            cv2.imwrite(file_path, cropped_image)
+            print(f'Image {fullFilename} saved with border removed')
+        else:
+            print(f'Failed to decode image {fullFilename}')
+
+    except Exception as e:
         print(f'Failed to download image.', e)
 
 def build_images(): 
