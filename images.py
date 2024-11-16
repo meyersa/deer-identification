@@ -6,11 +6,7 @@ import requests
 import json
 import os 
 import dotenv
-import time 
-import cv2
-import numpy as np
-from PIL import Image
-import imagehash
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 dotenv.load_dotenv()
 
@@ -24,7 +20,6 @@ IMAGE_TOTAL = int(os.getenv("IMAGE_TOTAL"))
 # Default values
 TAKE_AMOUNT = int(os.getenv("TAKE_AMOUNT") or 50)
 IMAGE_DIR = os.path.join(os.getcwd(), "images")
-IMAGE_SIM_THRESH = int(os.getenv("IMAGE_SIM_THRESH") or 100)
 
 post_headers = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
@@ -146,7 +141,7 @@ def get_image_range(skip, take):
 
 def get_image(url, fullFilename):
     """
-    Download an image from the provided URL, save it, and remove a 50-pixel border at the bottom.
+    Download an image from the provided URL and save it to the IMAGE_DIR directory.
 
     Args:
         url (str): The URL from which the image will be downloaded.
@@ -163,31 +158,25 @@ def get_image(url, fullFilename):
         res = requests.get(url, stream=True)
         res.raise_for_status()
         
-        # Load image into memory
-        image_array = np.asarray(bytearray(res.content), dtype=np.uint8)
-        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+        # Save image to the original directory
+        with open(file_path, 'wb') as f:
+            f.write(res.content)
 
-        if image is not None:
-            # Remove 50-pixel border at the bottom
-            cropped_image = image[:-35, :]  # Crop 50 pixels from the bottom
-
-            # Save cropped image
-            cv2.imwrite(file_path, cropped_image)
-            print(f'Image {fullFilename} saved with border removed')
-        else:
-            print(f'Failed to decode image {fullFilename}')
+        print(f'Image {fullFilename} saved')
 
     except Exception as e:
-        print(f'Failed to download image.', e)
+        print(f'Failed to download image: {e}')
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def build_images(): 
     """
-    Main function to orchestrate the image download process.
+    Main function to orchestrate the image download process with multithreading.
 
     This function performs the following steps:
     - Verifies that all required conditions (e.g., environment variables and directories) are met.
     - Retrieves the total number of images available from the API.
-    - Iteratively fetches batches of images and downloads them to the local 'images' directory.
+    - Iteratively fetches batches of images and downloads them concurrently to the local 'images' directory.
     - Continues fetching images until all available images have been downloaded.
 
     Raises:
@@ -205,73 +194,36 @@ def build_images():
         image_total = get_image_count()
 
     while True:         
-        # <-- Decide how many images to get -->
         if (skip + take) > image_total:
-
-            # Should be the remainder
-            # Fail logic is considered before starting loop
             take = image_total - skip
 
-        # <-- Get images section -->
         print(f'Getting images {skip}/{image_total}...')
 
         res_images = get_image_range(skip, take)
         print(f'Received {len(res_images)}. Saving...')
 
-        print(f'Saving images...')
-        for image in res_images.values(): 
-            fail_count = 0
-            while True: 
+        # Use ThreadPoolExecutor for concurrent downloads
+        with ThreadPoolExecutor(max_workers=5) as executor:  # Adjust `max_workers` as needed
+            future_to_image = {
+                executor.submit(get_image, image.get("imageUrl"), image.get("fullFilename")): image
+                for image in res_images.values()
+            }
+
+            for future in as_completed(future_to_image):
+                image = future_to_image[future]
                 try:
-                    get_image(image.get("imageUrl"), image.get("fullFilename"))
-                    break 
+                    future.result()  # Raises exception if download failed
+                    print(f"Saved image: {image.get('fullFilename')}")
+                except Exception as e:
+                    print(f"Failed to save image {image.get('fullFilename')}: {e}")
 
-                except: 
-                    fail_count += 1
+        print('Saved all images')
 
-                    # If failed more than 3 times, continue
-                    if fail_count > 3: 
-                        print(f'Failed to download {image.get("fullFilename")} after 3 attemps, skipping')
-                        break
-
-                    print(f'Failed to get image {image.get("fullFilename")}. Retrying in {15 * fail_count} seconds...')
-                    time.sleep(15 * fail_count)
-        
-        print(f'Saved all images')
-
-        # <-- Skip logic --> 
         skip += take
 
-        # Over
         if skip > (image_total - 1): 
             break
 
-def remove_similar_images():
-    """
-    Remove visually similar images based on perceptual hash.
-    """
-    removed = 0 
 
-    hashes = {}
-    for filename in os.listdir(IMAGE_DIR):
-        file_path = os.path.join(IMAGE_DIR, filename)
-        if os.path.isfile(file_path):
-            try:
-                img = Image.open(file_path)
-                phash = imagehash.phash(img)  # Calculate perceptual hash
-                if any(phash - h >= IMAGE_SIM_THRESH for h in hashes.keys()):
-                    print(f"Similar image found: {file_path}, removing.")
-                    os.remove(file_path)
-                    removed += 1
-                else:
-
-                    hashes[phash] = file_path
-            except Exception as e:
-                print(f"Error processing {file_path}: {e}")
-
-    print(str(IMAGE_SIM_THRESH) + " " + str(removed))
-
-
-if __name__ == "__main__":
+if __name__ == "__main__": 
     build_images()
-    remove_similar_images()
