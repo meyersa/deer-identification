@@ -12,14 +12,16 @@ import numpy as np
 
 dotenv.load_dotenv()
 
+# Can't be none - checked in preflight
 API_URL = os.getenv("API_URL")
 API_BEARER = os.getenv("API_BEARER")
-IMAGE_TOTAL = os.getenv("IMAGE_TOTAL")
 
-print(IMAGE_TOTAL)
+# Defaults to checking if None
+IMAGE_TOTAL = int(os.getenv("IMAGE_TOTAL"))
 
+# Default values
+TAKE_AMOUNT = int(os.getenv("TAKE_AMOUNT") or 50)
 IMAGE_DIR = os.path.join(os.getcwd(), "images")
-TAKE_AMOUNT = 50
 
 post_headers = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
@@ -81,12 +83,13 @@ def get_image_count():
 
     return image_count
 
-def get_image_range(skip): 
+def get_image_range(skip, take): 
     """
     Fetch a range of image data from the API starting at the specified skip value.
 
     Args:
         skip (int): The starting index (offset) for fetching the images.
+        take (int): The amount of images to take when fetching the images.
 
     Returns:
         dict: A dictionary where each key is an image GUID, and the value is another dictionary with details about the image.
@@ -108,7 +111,7 @@ def get_image_range(skip):
     print(f'Requesting image range {skip}...')
 
     post_url = f'{API_URL}/api/v4/file-manager/images'
-    post_body = json.dumps({"skipcount": skip, "takeCount": TAKE_AMOUNT})
+    post_body = json.dumps({"skipcount": skip, "takeCount": take})
 
     res = requests.post(post_url, headers=post_headers, data=post_body)
     res.raise_for_status()
@@ -191,16 +194,25 @@ def build_images():
     preflight_checks()
 
     skip = 0
+    take = TAKE_AMOUNT
+    image_total = IMAGE_TOTAL
 
-    global IMAGE_TOTAL
-    if not IMAGE_TOTAL:
-        IMAGE_TOTAL = get_image_count()
+    # Set default amount of images to get if not set
+    if not image_total:
+        image_total = get_image_count()
 
-    while True: 
+    while True:         
+        # <-- Decide how many images to get -->
+        if (skip + take) > image_total:
+
+            # Should be the remainder
+            # Fail logic is considered before starting loop
+            take = image_total - skip
+
         # <-- Get images section -->
-        print(f'Getting images {skip}/{IMAGE_TOTAL}...')
+        print(f'Getting images {skip}/{image_total}...')
 
-        res_images = get_image_range(skip)
+        res_images = get_image_range(skip, take)
         print(f'Received {len(res_images)}. Saving...')
 
         print(f'Saving images...')
@@ -225,19 +237,11 @@ def build_images():
         print(f'Saved all images')
 
         # <-- Skip logic --> 
-        dif = IMAGE_TOTAL - skip
-        # If skip gap is greater than skip amount, add amount
-        if dif > TAKE_AMOUNT: 
-            skip += TAKE_AMOUNT
-        
-        # Else if gap is greater than 1, add difference
-        elif dif > 0: 
-            skip += dif
+        skip += take
 
-        # Else exist
-        else: 
+        # Over
+        if skip > (image_total - 1): 
             break
-
 
 if __name__ == "__main__":
     build_images()
