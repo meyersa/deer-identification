@@ -11,9 +11,10 @@ IMAGE_DIR = os.path.join(os.getcwd(), "images")  # Path for original images
 IMAGE_PROCESSED_DIR = os.path.join(os.getcwd(), "processed-images")  # Directory for processed images
 IMAGE_JSON = os.path.join(os.getcwd(), "images.json")
 
-def preflight_checks():
+def preflight_checks() -> None:
     """
-    Ensure necessary directories exist.
+    Ensure the required directories for processing images exist. 
+    Creates the processed images directory if it does not exist.
     """
     print("Ensuring directory exists...")
     if not os.path.exists(IMAGE_PROCESSED_DIR):
@@ -22,13 +23,13 @@ def preflight_checks():
     else:
         print(f"Directory already exists: {IMAGE_PROCESSED_DIR}")
 
-def process_image(file_path, filename):
+def process_image(file_path: str, filename: str) -> None:
     """
-    Process an image by cropping, resizing, and saving to the processed directory.
+    Process an image by cropping, resizing, and saving it to the processed directory.
 
     Args:
-        file_path (str): The path to the original image.
-        filename (str): The name of the file to save the processed image as.
+        file_path (str): The full path to the original image file.
+        filename (str): The name of the file to save the processed image under.
     """
     try:
         img = cv2.imread(file_path)
@@ -38,7 +39,7 @@ def process_image(file_path, filename):
         # Crop the bottom 25 pixels
         img_cropped = img[:-25, :]
 
-        # Resize the image (optional, adjust the scale factor as needed)
+        # Resize the image (reduce dimensions by half)
         img_resized = cv2.resize(
             img_cropped, (img_cropped.shape[1] // 2, img_cropped.shape[0] // 2)
         )
@@ -51,11 +52,12 @@ def process_image(file_path, filename):
     except Exception as e:
         print(f"Failed to process {file_path}: {e}")
 
-def remove_duplicates():
+def remove_duplicates() -> None:
     """
-    Search IMAGE_PROCESSED_DIR for duplicate images using duplicate_images library.
-
-    Keeps the first image in each duplicate group and deletes the rest.
+    Identify and remove duplicate images in the processed images directory.
+    
+    Uses the `duplicate_images` library to find duplicates based on image hashes.
+    Retains only the first image in each duplicate group.
     """
     print("Searching for duplicates...")
     try:
@@ -82,33 +84,41 @@ def remove_duplicates():
     except Exception as e:
         print(f"Error during duplicate removal: {e}")
 
-def clean_json(): 
+def clean_json() -> None:
     """
-    Dumping to json with only current values 
-    """
-    print("Saving new json to file")
+    Update the JSON file to include only the images currently in the processed directory.
 
-    all_images = dict() 
+    Loads existing image data from the JSON file, filters it to match current processed images,
+    and saves the updated data back to the file.
+    """
+    print("Saving new JSON to file...")
+
+    all_images = dict()
     cur_images = [
         f for f in os.listdir(IMAGE_PROCESSED_DIR)
         if f.lower().endswith(('.png', '.jpg', '.jpeg'))
     ]
 
-    with open(IMAGE_JSON, 'r') as f: 
-        all_images.update(json.load(f))
+    try:
+        with open(IMAGE_JSON, 'r') as f:
+            all_images.update(json.load(f))
+    except FileNotFoundError:
+        print("JSON file not found. Creating a new one.")
 
     final_images = {key: value for key, value in all_images.items() if f'{key}.JPG' in cur_images}
 
-    with open(IMAGE_JSON, 'w') as f: 
+    with open(IMAGE_JSON, 'w') as f:
         json.dump(final_images, f, indent=6)
 
-    print("Done saving to file")
+    print("Done saving to file.")
 
-def process_images():
+def process_images() -> None:
     """
-    Iterate over all images in IMAGE_DIR, process them, and remove duplicates.
-
-    Processes .png, .jpg, and .jpeg files using parallel processing.
+    Orchestrate the full image processing workflow:
+    - Ensure necessary directories exist.
+    - Process all images in the `IMAGE_DIR` directory.
+    - Remove duplicate images from the processed directory.
+    - Update the JSON file with the current processed images.
     """
     preflight_checks()
     print("Starting image processing...")
