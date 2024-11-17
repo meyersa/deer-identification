@@ -15,7 +15,7 @@ API_URL = os.getenv("API_URL")
 API_BEARER = os.getenv("API_BEARER")
 
 # Defaults to checking if None
-IMAGE_TOTAL = int(os.getenv("IMAGE_TOTAL"))
+IMAGE_TOTAL = os.getenv("IMAGE_TOTAL", None)
 
 # Default values
 TAKE_AMOUNT = int(os.getenv("TAKE_AMOUNT") or 50)
