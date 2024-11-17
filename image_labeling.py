@@ -1,122 +1,159 @@
-import json
 import tkinter as tk
 import tkinter.messagebox
 from PIL import Image, ImageTk
+import json
 import os
 
-# Environment variables
-IMAGE_JSON = os.path.join(os.getcwd(), "images.json")
-IMAGE_PROCESSED_DIR = os.path.join(os.getcwd(), "processed-images")
+# Environment variable paths
+IMAGE_JSON = os.getenv("IMAGES_JSON", "images.json")
+IMAGE_PROCESSED_DIR = os.getenv("IMAGE_PROCESSED_DIR", "processed-images")
 
-# Load the image data from the JSON file
-def load_image_json():
-    """
-    Load the image JSON data.
-    Returns a dictionary of image file names and their associated metadata.
-    """
-    try:
-        with open(IMAGE_JSON, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        print("JSON file not found, starting with an empty dictionary.")
+def load_json_data():
+    """Load image data from the JSON file."""
+    if os.path.exists(IMAGE_JSON):
+        with open(IMAGE_JSON, 'r') as file:
+            return json.load(file)
+    else:
+        print(f"JSON file not found: {IMAGE_JSON}")
         return {}
 
-# Save the image JSON data to file
-def save_image_json(data):
-    """
-    Save the updated image JSON data to file.
-    """
-    with open(IMAGE_JSON, 'w') as f:
-        json.dump(data, f, indent=6)
-    print("Image tags saved.")
+# Initialize data
+image_data = load_json_data()
+image_keys = list(image_data.keys())
+current_index = 0
+tagged_images = {}
 
-# Display an image using Tkinter
-def display_image(image_path, window):
-    """
-    Display an image in the Tkinter window.
-    """
-    img = Image.open(image_path)
-    img = img.resize((512, 272))  # Resize to fit the window
+def update_progress():
+    """Update the progress label."""
+    progress_label.config(
+        text=f"Progress: {current_index + 1}/{len(image_keys)}"
+    )
 
-    # Convert the image to a Tkinter-compatible format
-    img_tk = ImageTk.PhotoImage(img)
+def update_tags_display():
+    """Update the current tags display."""
+    image_id = image_keys[current_index]
+    tags = image_data.get(image_id).get("newTags")
+    tags_text.config(state=tk.NORMAL)
+    tags_text.delete(1.0, tk.END)
+    tags_text.insert(tk.END, f"Tags: {', '.join(tags) if tags else 'None'}")
+    tags_text.config(state=tk.DISABLED)
 
-    label = tk.Label(window, image=img_tk)
-    label.image = img_tk  # Keep a reference to the image
-    label.grid(row=0, column=0, padx=10, pady=10)
+def update_image_info_display():
+    """Update the image ID and file name display."""
+    image_id = image_keys[current_index]
+    image_info = image_data[image_id]
+    image_info_text.config(state=tk.NORMAL)
+    image_info_text.delete(1.0, tk.END)
+    image_info_text.insert(tk.END, f"ID: {image_id}\nFile: {image_info['fullFilename']}")
+    image_info_text.config(state=tk.DISABLED)
 
-# Add a tag to an image's metadata in memory
-def add_tag_to_image(image_id, tag, image_data):
-    """
-    Add a tag to an image based on its ID in the image data.
-    """
-    if image_id in image_data:
-        if tag not in image_data[image_id]["imageTags"]:
-            image_data[image_id]["imageTags"].append(tag)
-            print(f"Tag '{tag}' added to image ID: {image_id}")
-        else:
-            print(f"Tag '{tag}' already exists for image ID: {image_id}")
+def load_image():
+    """Load the current image on the screen."""
+    global current_image, image_label
+
+    # Clear existing image
+    image_label.config(image="")
+
+    # Get the current image data
+    image_id = image_keys[current_index]
+    image_info = image_data[image_id]
+    image_path = os.path.join(IMAGE_PROCESSED_DIR, image_info["fullFilename"])
+
+    # Open and display the image
+    try:
+        img = Image.open(image_path)
+        img = img.resize((512, 272))  # Resize to fit the window
+        current_image = ImageTk.PhotoImage(img)
+        image_label.config(image=current_image)
+    except FileNotFoundError:
+        print(f"Image not found: {image_path}")
+
+    update_progress()
+    update_tags_display()
+    update_image_info_display()
+
+def save_tags():
+    """Save the current tagged images to the JSON file."""
+    for image_id, tags in tagged_images.items():
+        image_data[image_id]["newTags"] = tags
+
+    with open(IMAGE_JSON, 'w') as file:
+        json.dump(image_data, file, indent=4)
+
+    tk.messagebox.showinfo("Save Tags", "Tags have been saved successfully.")
+
+def tag_image(tag):
+    """Tag the current image and move to the next."""
+    global current_index
+
+    # Add the tag to the current image
+    image_id = image_keys[current_index]
+    if image_id not in tagged_images:
+        tagged_images[image_id] = []
+    tagged_images[image_id].append(tag)
+
+    # Move to the next image
+    if current_index < len(image_keys) - 1:
+        current_index += 1
+        load_image()
     else:
-        print(f"Image ID '{image_id}' not found in the data.")
+        tk.messagebox.showinfo("End of Images", "You have tagged all images.")
+        save_tags()
 
-# Get the next image to display (first untagged image)
-def get_next_image(image_data):
-    """
-    Get the next untagged image to display. Return the image ID and file path.
-    """
-    for image_id, data in image_data.items():
-        if not data.get("imageTags"):  # If the image has no tags
-            return image_id, os.path.join(IMAGE_PROCESSED_DIR, data["fullFilename"])
-    return None, None  # No untagged images left
+def create_gui():
+    """Set up the GUI and run the application."""
+    global image_label, progress_label, tags_text, image_info_text
 
-# Create the tagging window using Tkinter
-def create_tagging_window():
-    """
-    Create the Tkinter window for image tagging.
-    """
-    # Load the image data from JSON
-    image_data = load_image_json()
-
-    # Create a new window
+    # Initialize the tkinter window
     window = tk.Tk()
-    window.title("Image Tagging for CNN Training")
+    window.title("Image Tagging Tool")
+    window.geometry("600x800")
 
-    # Get the next untagged image
-    image_id, image_path = get_next_image(image_data)
+    # Display the current image
+    image_label = tk.Label(window)
+    image_label.pack(pady=10)
 
-    if image_id is None:
-        print("All images are tagged.")
-        window.quit()
-        return
+    # Progress label
+    progress_label = tk.Label(window, text="Progress: 0/0", font=("Arial", 12))
+    progress_label.pack(pady=5)
 
-    # Display the image
-    display_image(image_path, window)
+    # Image info display (copyable)
+    image_info_text = tk.Text(window, height=4, width=50, wrap=tk.WORD, font=("Arial", 10))
+    image_info_text.config(state=tk.DISABLED)
+    image_info_text.pack(pady=5)
 
-    # Functions for tagging as "deer" or "not-deer"
-    def tag_deer():
-        add_tag_to_image(image_id, "deer", image_data)
-        window.quit()
+    # Current tags display (copyable)
+    tags_text = tk.Text(window, height=2, width=50, wrap=tk.WORD, font=("Arial", 10))
+    tags_text.config(state=tk.DISABLED)
+    tags_text.pack(pady=5)
 
-    def tag_not_deer():
-        add_tag_to_image(image_id, "not-deer", image_data)
-        window.quit()
+    # Button container frame
+    button_frame = tk.Frame(window)
+    button_frame.pack(pady=20)
 
-    # Button for tagging as 'deer'
-    deer_button = tk.Button(window, text="Deer", command=tag_deer)
-    deer_button.grid(row=1, column=0, padx=10, pady=10)
+    # Deer and Not Deer buttons
+    deer_button = tk.Button(
+        button_frame, text="Deer", command=lambda: tag_image("deer"), width=15
+    )
+    deer_button.grid(row=0, column=0, padx=10)
 
-    # Button for tagging as 'not-deer'
-    not_deer_button = tk.Button(window, text="Not Deer", command=tag_not_deer)
-    not_deer_button.grid(row=1, column=1, padx=10, pady=10)
+    not_deer_button = tk.Button(
+        button_frame, text="Not Deer", command=lambda: tag_image("not-deer"), width=15
+    )
+    not_deer_button.grid(row=0, column=1, padx=10)
 
-    # Run the Tkinter event loop
+    # Save button
+    save_button = tk.Button(
+        window, text="Save Tags", command=save_tags, width=20
+    )
+    save_button.pack(pady=10)
+
+    # Start by loading the first image
+    load_image()
+
+    # Start the tkinter main loop
     window.mainloop()
 
-    # After closing the window, ask the user if they want to save changes
-    save_prompt = tkinter.messagebox.askyesno("Save Tags", "Do you want to save all tagged images?")
-    if save_prompt:
-        save_image_json(image_data)
-
-# Main loop to run the image tagging process
+# Driver code
 if __name__ == "__main__":
-    create_tagging_window()
+    create_gui()
