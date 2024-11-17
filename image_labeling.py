@@ -84,7 +84,7 @@ def load_image() -> None:
     # Open and display the image
     try:
         img = Image.open(image_path)
-        img = img.resize((512, 272))  # Resize to fit the window
+        img = img.resize((int(1.5 * 512), int(1.5 * 272)))  # Resize to fit the window
         current_image = ImageTk.PhotoImage(img)
         image_label.config(image=current_image)
     except FileNotFoundError:
@@ -146,7 +146,6 @@ def create_gui() -> None:
     # Initialize the tkinter window
     window = tk.Tk()
     window.title("Image Tagging Tool")
-    window.geometry("600x800")
 
     # Display the current image
     image_label = tk.Label(window)
