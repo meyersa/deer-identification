@@ -3,61 +3,83 @@ import tkinter.messagebox
 from PIL import Image, ImageTk
 import json
 import os
+from typing import Dict, List, Any
 
 # Environment variable paths
-IMAGE_JSON = os.getenv("IMAGES_JSON", "images.json")
-IMAGE_PROCESSED_DIR = os.getenv("IMAGE_PROCESSED_DIR", "processed-images")
+IMAGE_JSON: str = os.getenv("IMAGES_JSON", "images.json")
+IMAGE_PROCESSED_DIR: str = os.getenv("IMAGE_PROCESSED_DIR", "processed-images")
 
-def load_json_data():
-    """Load image data from the JSON file."""
+
+def load_json_data() -> Dict[str, Any]:
+    """
+    Load image data from the JSON file.
+
+    Returns:
+        A dictionary containing image metadata.
+    """
     if os.path.exists(IMAGE_JSON):
-        with open(IMAGE_JSON, 'r') as file:
-            return json.load(file)
+        try:
+            with open(IMAGE_JSON, 'r') as file:
+                data = json.load(file)
+                print(f"Loaded JSON data from {IMAGE_JSON}")
+                return data
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON: {e}")
+            return {}
     else:
         print(f"JSON file not found: {IMAGE_JSON}")
         return {}
 
-# Initialize data
-image_data = load_json_data()
-image_keys = list(image_data.keys())
-current_index = 0
-tagged_images = {}
 
-def update_progress():
-    """Update the progress label."""
+# Initialize data
+image_data: Dict[str, Any] = load_json_data()
+image_keys: List[str] = list(image_data.keys())
+current_index: int = 0
+tagged_images: Dict[str, List[str]] = {}
+
+
+def update_progress() -> None:
+    """Update the progress label to show the current image index."""
     progress_label.config(
         text=f"Progress: {current_index + 1}/{len(image_keys)}"
     )
 
-def update_tags_display():
-    """Update the current tags display."""
+
+def update_tags_display() -> None:
+    """Update the tags display for the current image."""
     image_id = image_keys[current_index]
-    tags = image_data.get(image_id).get("newTags")
+    tags = image_data.get(image_id, {}).get("newTags", [])
     tags_text.config(state=tk.NORMAL)
     tags_text.delete(1.0, tk.END)
     tags_text.insert(tk.END, f"Tags: {', '.join(tags) if tags else 'None'}")
     tags_text.config(state=tk.DISABLED)
 
-def update_image_info_display():
+
+def update_image_info_display() -> None:
     """Update the image ID and file name display."""
     image_id = image_keys[current_index]
-    image_info = image_data[image_id]
+    image_info = image_data.get(image_id, {})
     image_info_text.config(state=tk.NORMAL)
     image_info_text.delete(1.0, tk.END)
-    image_info_text.insert(tk.END, f"ID: {image_id}\nFile: {image_info['fullFilename']}")
+    image_info_text.insert(tk.END, f"ID: {image_id}\nFile: {image_info.get('fullFilename', 'Unknown')}")
     image_info_text.config(state=tk.DISABLED)
 
-def load_image():
-    """Load the current image on the screen."""
+
+def load_image() -> None:
+    """Load the current image onto the screen."""
     global current_image, image_label
 
     # Clear existing image
     image_label.config(image="")
 
+    if not image_keys:
+        print("No images to display.")
+        return
+
     # Get the current image data
     image_id = image_keys[current_index]
-    image_info = image_data[image_id]
-    image_path = os.path.join(IMAGE_PROCESSED_DIR, image_info["fullFilename"])
+    image_info = image_data.get(image_id, {})
+    image_path = os.path.join(IMAGE_PROCESSED_DIR, image_info.get("fullFilename", ""))
 
     # Open and display the image
     try:
@@ -72,35 +94,52 @@ def load_image():
     update_tags_display()
     update_image_info_display()
 
-def save_tags():
-    """Save the current tagged images to the JSON file."""
+
+def save_tags() -> None:
+    """Save the current tagged images back to the JSON file."""
     for image_id, tags in tagged_images.items():
         image_data[image_id]["newTags"] = tags
 
-    with open(IMAGE_JSON, 'w') as file:
-        json.dump(image_data, file, indent=4)
+    try:
+        with open(IMAGE_JSON, 'w') as file:
+            json.dump(image_data, file, indent=4)
+        print("Tags saved successfully.")
+        tk.messagebox.showinfo("Save Tags", "Tags have been saved successfully.")
+    except IOError as e:
+        print(f"Error saving tags: {e}")
+        tk.messagebox.showerror("Error", f"Could not save tags: {e}")
 
-    tk.messagebox.showinfo("Save Tags", "Tags have been saved successfully.")
 
-def tag_image(tag):
-    """Tag the current image and move to the next."""
+def tag_image(tag: str) -> None:
+    """Tag the current image with the given tag and move to the next.
+
+    Args:
+        tag: The tag to apply to the current image.
+    """
     global current_index
+
+    if not image_keys:
+        print("No images to tag.")
+        return
 
     # Add the tag to the current image
     image_id = image_keys[current_index]
     if image_id not in tagged_images:
         tagged_images[image_id] = []
     tagged_images[image_id].append(tag)
+    print(f"Tagged image {image_id} with '{tag}'.")
 
     # Move to the next image
     if current_index < len(image_keys) - 1:
         current_index += 1
         load_image()
     else:
+        print("All images have been tagged.")
         tk.messagebox.showinfo("End of Images", "You have tagged all images.")
         save_tags()
 
-def create_gui():
+
+def create_gui() -> None:
     """Set up the GUI and run the application."""
     global image_label, progress_label, tags_text, image_info_text
 
@@ -153,6 +192,7 @@ def create_gui():
 
     # Start the tkinter main loop
     window.mainloop()
+
 
 # Driver code
 if __name__ == "__main__":
