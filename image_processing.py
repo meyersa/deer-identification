@@ -107,6 +107,11 @@ def clean_json() -> None:
 
     final_images = {key: value for key, value in all_images.items() if f'{key}.JPG' in cur_images}
 
+    # Delete imageUrl since it is crazy long with AWS access token
+    for k, v in final_images.items(): 
+        if "imageUrl" in v:
+            del v["imageUrl"]
+
     with open(IMAGE_JSON, 'w') as f:
         json.dump(final_images, f, indent=6)
 
