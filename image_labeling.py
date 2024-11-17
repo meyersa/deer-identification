@@ -71,6 +71,8 @@ def tag_image(tag, image_id):
     image_data[image_id]["newTags"] = [tag]
     print(f"Tagged image {image_id} with '{tag}'")
 
+    show_next_image()
+
 def create_gui():
     """Set up the GUI and run the application."""
     global image_label, progress_label, tags_text, image_info_text, current_image
@@ -104,6 +106,9 @@ def create_gui():
     not_deer_button = tk.Button(button_frame, text="Not Deer", command=lambda: tag_image("not-deer", current_image_id), width=15)
     not_deer_button.grid(row=0, column=1, padx=10)
 
+    bad_button = tk.Button(button_frame, text="Bad Image", command=lambda: tag_image("bad", current_image_id), width=15)
+    bad_button.grid(row=0, column=3, padx=10)
+
     # Navigation buttons
     back_button = tk.Button(window, text="Back", command=show_previous_image, width=20)
     back_button.pack(pady=10)
@@ -115,6 +120,7 @@ def create_gui():
     window.bind('b', lambda event: show_previous_image())
     window.bind('n', lambda event: tag_image("not-deer", current_image_id))
     window.bind('m', lambda event: tag_image("deer", current_image_id))
+    window.bind('v', lambda event: tag_image("bad", current_image_id))
 
     # Start the application
     load_next_image()
@@ -129,11 +135,9 @@ def load_next_image():
         print("No images to display.")
         return
 
-    # Find the next image without tags
+    # Find the next image without tags (start with the first untagged image)
     current_image_id = next((img_id for img_id, info in image_data.items() if "newTags" not in info), None)
 
-    print(f'Displaying image {current_image_id}')
-    
     if current_image_id:
         img = load_image(current_image_id)
         if img:
@@ -154,6 +158,7 @@ def show_previous_image():
     image_ids = list(image_data.keys())
     current_index = image_ids.index(current_image_id)
     
+    # Make sure the previous image is loaded and properly handles going up and down
     if current_index > 0:
         current_image_id = image_ids[current_index - 1]
         img = load_image(current_image_id)
@@ -163,6 +168,23 @@ def show_previous_image():
             update_tags_display(current_image_id)
             update_image_info(current_image_id)
             update_progress(current_index - 1, len(image_data))
+
+def show_next_image():
+    """Go to the next image."""
+    global current_image_id, current_image
+    image_ids = list(image_data.keys())
+    current_index = image_ids.index(current_image_id)
+    
+    # Make sure the next image is loaded and properly handles going up and down
+    if current_index < len(image_ids) - 1:
+        current_image_id = image_ids[current_index + 1]
+        img = load_image(current_image_id)
+        if img:
+            current_image = img  # Keep a reference to the image
+            image_label.config(image=current_image)
+            update_tags_display(current_image_id)
+            update_image_info(current_image_id)
+            update_progress(current_index + 1, len(image_data))
 
 # Driver code
 if __name__ == "__main__":
