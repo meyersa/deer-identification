@@ -20,6 +20,7 @@ IMAGE_TOTAL = int(os.getenv("IMAGE_TOTAL"))
 # Default values
 TAKE_AMOUNT = int(os.getenv("TAKE_AMOUNT") or 50)
 IMAGE_DIR = os.path.join(os.getcwd(), "images")
+IMAGE_JSON = os.path.join(os.getcwd(), "images.json")
 
 post_headers = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
@@ -167,8 +168,6 @@ def get_image(url, fullFilename):
     except Exception as e:
         print(f'Failed to download image: {e}')
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
 def build_images(): 
     """
     Main function to orchestrate the image download process with multithreading.
@@ -189,6 +188,8 @@ def build_images():
     take = TAKE_AMOUNT
     image_total = IMAGE_TOTAL
 
+    all_images = dict() 
+
     # Set default amount of images to get if not set
     if not image_total:
         image_total = get_image_count()
@@ -201,6 +202,8 @@ def build_images():
 
         res_images = get_image_range(skip, take)
         print(f'Received {len(res_images)}. Saving...')
+
+        all_images.update(res_images) 
 
         # Use ThreadPoolExecutor for concurrent downloads
         with ThreadPoolExecutor(max_workers=5) as executor:  # Adjust `max_workers` as needed
@@ -224,6 +227,12 @@ def build_images():
         if skip > (image_total - 1): 
             break
 
+    print(f'Saving image dictionary to JSON...')
+
+    with open(IMAGE_JSON, 'w') as f: 
+        json.dump(all_images, f, indent=6)
+
+    print(f'Saved') 
 
 if __name__ == "__main__": 
     build_images()
