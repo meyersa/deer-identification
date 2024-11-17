@@ -121,13 +121,11 @@ def get_image_range(skip, take):
 
     image_dict = dict() 
     for image in image_res.get("images"): 
-        imageGuid = image.get("imageGuid")
-
-        image_dict[imageGuid] = {
+        image_dict[image.get("filename")] = {
             "imageUrl" : image.get("imageUrl"),
             "createdDateTime": image.get("createdDateTime"),
             "fullFilename": image.get("fullFilename"), 
-            "imageGuid": imageGuid,
+            "imageGuid": image.get("imageGuid"),
             "imageTags": image.get("imageTags"), 
             "moonPhase": image.get("moonPhase"),
             "pressure": image.get("pressure"),

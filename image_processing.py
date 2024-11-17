@@ -1,5 +1,6 @@
 import os
 import cv2
+import json
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from duplicate_images.duplicate import get_matches
@@ -8,6 +9,7 @@ from duplicate_images.pair_finder_options import PairFinderOptions
 # Define paths for processed images
 IMAGE_DIR = os.path.join(os.getcwd(), "images")  # Path for original images
 IMAGE_PROCESSED_DIR = os.path.join(os.getcwd(), "processed-images")  # Directory for processed images
+IMAGE_JSON = os.path.join(os.getcwd(), "images.json")
 
 def preflight_checks():
     """
@@ -80,6 +82,28 @@ def remove_duplicates():
     except Exception as e:
         print(f"Error during duplicate removal: {e}")
 
+def clean_json(): 
+    """
+    Dumping to json with only current values 
+    """
+    print("Saving new json to file")
+
+    all_images = dict() 
+    cur_images = [
+        f for f in os.listdir(IMAGE_PROCESSED_DIR)
+        if f.lower().endswith(('.png', '.jpg', '.jpeg'))
+    ]
+
+    with open(IMAGE_JSON, 'r') as f: 
+        all_images.update(json.load(f))
+
+    final_images = {key: value for key, value in all_images.items() if f'{key}.JPG' in cur_images}
+
+    with open(IMAGE_JSON, 'w') as f: 
+        json.dump(final_images, f, indent=6)
+
+    print("Done saving to file")
+
 def process_images():
     """
     Iterate over all images in IMAGE_DIR, process them, and remove duplicates.
@@ -106,7 +130,9 @@ def process_images():
             executor.submit(process_image, file_path, filename)
 
     print("Image processing complete. Now removing duplicates...")
+
     remove_duplicates()
+    clean_json()
 
 if __name__ == "__main__":
     process_images()
