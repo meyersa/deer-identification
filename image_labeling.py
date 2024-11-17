@@ -37,6 +37,27 @@ image_keys: List[str] = list(image_data.keys())
 current_index: int = 0
 tagged_images: Dict[str, List[str]] = {}
 
+def get_next_image() -> None:
+    """Get the next image that hasn't been tagged yet."""
+    global current_index
+    while current_index < len(image_keys) and image_keys[current_index] in tagged_images:
+        current_index += 1
+
+    if current_index >= len(image_keys):  # All images tagged
+        print("All images have been tagged.")
+        tk.messagebox.showinfo("End of Images", "You have tagged all images.")
+        save_tags()
+        return
+
+    load_image()
+
+def get_previous_image() -> None:
+    """Go back to the previous image."""
+    global current_index
+    if current_index > 0:
+        current_index -= 1
+        load_image()
+
 
 def update_progress() -> None:
     """Update the progress label to show the current image index."""
@@ -126,17 +147,10 @@ def tag_image(tag: str) -> None:
     image_id = image_keys[current_index]
     if image_id not in tagged_images:
         tagged_images[image_id] = []
-    tagged_images[image_id].append(tag)
+    tagged_images[image_id] = [tag]
     print(f"Tagged image {image_id} with '{tag}'.")
 
-    # Move to the next image
-    if current_index < len(image_keys) - 1:
-        current_index += 1
-        load_image()
-    else:
-        print("All images have been tagged.")
-        tk.messagebox.showinfo("End of Images", "You have tagged all images.")
-        save_tags()
+    get_next_image()
 
 
 def create_gui() -> None:
@@ -180,14 +194,24 @@ def create_gui() -> None:
     )
     not_deer_button.grid(row=0, column=1, padx=10)
 
+    # Back button
+    back_button = tk.Button(
+        window, text="Back", command=get_previous_image, width=20
+    )
+    back_button.pack(pady=10)
+
     # Save button
     save_button = tk.Button(
         window, text="Save Tags", command=save_tags, width=20
     )
     save_button.pack(pady=10)
 
+    window.bind('b', lambda event: get_previous_image())
+    window.bind('n', lambda event: tag_image("not-deer"))
+    window.bind('m', lambda event: tag_image("deer"))
+
     # Start by loading the first image
-    load_image()
+    get_next_image()
 
     # Start the tkinter main loop
     window.mainloop()
