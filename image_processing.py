@@ -37,16 +37,11 @@ def process_image(file_path: str, filename: str) -> None:
             raise ValueError("Image file could not be read.")
 
         # Crop the bottom 25 pixels
-        img_cropped = img[:-25, :]
-
-        # Resize the image (reduce dimensions by half)
-        img_resized = cv2.resize(
-            img_cropped, (img_cropped.shape[1] // 2, img_cropped.shape[0] // 2)
-        )
+        img_cropped = img[:-35, :]
 
         # Save the processed image
         processed_file_path = os.path.join(IMAGE_PROCESSED_DIR, filename)
-        cv2.imwrite(processed_file_path, img_resized)
+        cv2.imwrite(processed_file_path, img_cropped)
 
         print(f"Processed and saved: {filename}")
     except Exception as e:
