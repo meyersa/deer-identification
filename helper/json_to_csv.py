@@ -7,7 +7,9 @@ IMAGE_PROCESSED_DIR = os.getenv("IMAGE_PROCESSED_DIR", "processed-images")
 
 with open(IMAGE_JSON, 'r') as i, open(IMAGE_CSV, 'w') as o:
     i = json.load(i)
-
+    o.writelines(",".join(["image_path,label,timestamp","moonPhase","pressure","pressureTendency","temperature","wind","windDirection"]))
+    o.writelines("\n")
+    
     for line in i.values(): 
         deer_tag = line.get("newTags")
 
