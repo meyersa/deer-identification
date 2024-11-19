@@ -3,3 +3,8 @@ python-dotenv
 opencv-python
 duplicate-images
 pillow
+tensorflow
+tensorflow-macos
+tensorflow-metal
+numpy
+pandas
