@@ -141,7 +141,7 @@ def process_images() -> None:
 
     print("Image processing complete. Now removing duplicates...")
 
-    remove_duplicates()
+    # remove_duplicates()
     clean_json()
 
 if __name__ == "__main__":
